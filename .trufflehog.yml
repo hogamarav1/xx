@@ -1,0 +1,12 @@
+detectors:
+  - name: Stripe
+    regexes:
+      - sk_(live|test)_[0-9a-zA-Z]{24,34}
+    keywords:
+      - sk_live_
+      - sk_test_
+  - name: OpenAI
+    regexes:
+      - sk-proj-[0-9a-zA-Z]{20,50}
+    keywords:
+      - sk-proj-
