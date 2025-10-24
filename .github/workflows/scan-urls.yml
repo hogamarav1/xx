@@ -23,7 +23,7 @@ jobs:
         awk '!/^\s*$/{gsub(/^[ \t]+|[ \t]+$/, "", $0); print}' domains.txt > domains_clean.txt
         awk '!/^\s*$/{gsub(/^[ \t]+|[ \t]+$/, "", $0); print}' paths.txt > paths_clean.txt
         awk '{domain=$0; if (domain !~ /^https?:\/\//) domain="https://"domain; while ((getline path < "paths_clean.txt") > 0) {gsub(/^[ \t\/]+|[ \t\/]+$/, "", path); print domain"/"path}}' domains_clean.txt > full_urls.txt
-        # Limit to 1000 URLs (optional, adjust as needed)
+        # Limit to 1000 URLs (adjust as needed)
         head -n 1000 full_urls.txt > full_urls_limited.txt
         mv full_urls_limited.txt full_urls.txt
         echo "Generated $(wc -l < full_urls.txt) URLs"
@@ -32,7 +32,9 @@ jobs:
         # Loop through URLs and scan
         while IFS= read -r url; do
           echo "Scanning $url"
-          trufflehog http --url "$url" --config .trufflehog.yml --only-verified --json > "trufflehog-report-$(echo $url | tr '/' '_').json" || true
+          # Clean URL for file name (remove https://, :, /)
+          clean_url=$(echo "$url" | sed 's|https\?://||g' | tr '/:.' '___')
+          trufflehog http --url "$url" --config .trufflehog.yml --only-verified --json > "trufflehog-report-${clean_url}.json" || true
         done < full_urls.txt
     - name: Upload Reports
       if: always()
