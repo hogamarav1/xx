@@ -1,0 +1,36 @@
+name: Scan External URLs with Paths
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly auto run (optional)
+jobs:
+  scan-urls:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+    - name: Generate Full URLs (Domain + Path)
+      run: |
+        # Bash script to combine domains and paths
+        while IFS= read -r domain; do
+          while IFS= read -r path; do
+            full_url="${domain}/${path}"
+            echo "${full_url}" >> full_urls.txt
+          done < paths.txt
+        done < domains.txt
+    - name: Run TruffleHog on Full URLs
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: full_urls.txt
+        extra_args: --config .trufflehog.yml --only-verified --fail  # Use custom config
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload Report (Optional)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scan-report
+        path: trufflehog-report.json  # TruffleHog report file
