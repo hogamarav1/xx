@@ -1,1 +1,0 @@
-gh search code 'sk_live_ in:file stripe OR gpt' --limit 2000 --json name,repository,path,html_url > found.json
