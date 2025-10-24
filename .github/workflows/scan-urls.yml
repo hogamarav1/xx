@@ -12,25 +12,37 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
-    - name: Generate Full URLs (Domain + Path)
+    - name: Install curl and TruffleHog
       run: |
-        # Bash script to combine domains and paths
+        sudo apt-get update
+        sudo apt-get install -y curl
+        curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+    - name: Generate Full URLs with Auto HTTPS
+      run: |
+        # Bash script to add https:// and combine domains with paths
         while IFS= read -r domain; do
+          # Add https:// if not present
+          if [[ ! "$domain" =~ ^https?:// ]]; then
+            domain="https://$domain"
+          fi
           while IFS= read -r path; do
-            full_url="${domain}/${path}"
-            echo "${full_url}" >> full_urls.txt
+            # Remove leading/trailing slashes for clean URL
+            clean_domain=$(echo "$domain" | sed 's|/$||')
+            clean_path=$(echo "$path" | sed 's|^/||')
+            full_url="${clean_domain}/${clean_path}"
+            echo "$full_url" >> full_urls.txt
           done < paths.txt
         done < domains.txt
-    - name: Run TruffleHog on Full URLs
-      uses: trufflesecurity/trufflehog@main
-      with:
-        path: full_urls.txt
-        extra_args: --config .trufflehog.yml --only-verified --fail  # Use custom config
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Upload Report (Optional)
+    - name: Scan Each URL with TruffleHog
+      run: |
+        # Loop through each URL and scan with TruffleHog
+        while IFS= read -r url; do
+          echo "Scanning $url"
+          trufflehog http --url "$url" --config .trufflehog.yml --only-verified --json > "trufflehog-report-$(echo $url | tr '/' '_').json" || true
+        done < full_urls.txt
+    - name: Upload Reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: scan-report
-        path: trufflehog-report.json  # TruffleHog report file
+        path: trufflehog-report-*.json
