@@ -26,16 +26,26 @@ jobs:
         # Limit to 1000 URLs (adjust as needed)
         head -n 1000 full_urls.txt > full_urls_limited.txt
         mv full_urls_limited.txt full_urls.txt
+        # Clean empty lines and invalid characters
+        awk 'NF' full_urls.txt > full_urls_clean.txt
+        mv full_urls_clean.txt full_urls.txt
         echo "Generated $(wc -l < full_urls.txt) URLs"
+        # Debug: Show first few URLs
+        head -n 5 full_urls.txt
     - name: Scan Each URL with TruffleHog
       run: |
-        # Loop through URLs and scan
-        while IFS= read -r url; do
+        # Ensure all URLs are scanned
+        while IFS= read -r url || [[ -n "$url" ]]; do
+          # Skip empty lines
+          if [ -z "$url" ]; then
+            continue
+          fi
           echo "Scanning $url"
-          # Clean URL for file name (remove https://, :, /)
+          # Clean URL for file name
           clean_url=$(echo "$url" | sed 's|https\?://||g' | tr '/:.' '___')
           trufflehog http --url "$url" --config .trufflehog.yml --only-verified --json > "trufflehog-report-${clean_url}.json" || true
         done < full_urls.txt
+        echo "Scanned $(wc -l < full_urls.txt) URLs"
     - name: Upload Reports
       if: always()
       uses: actions/upload-artifact@v4
